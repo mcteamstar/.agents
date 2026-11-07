@@ -587,6 +587,32 @@ def _write_opencode_agents_md():
     print(f'  updated  {agents_md} ({len(parts)} context file(s))')
 
 
+def sync_prompt_skills_codex():
+    """Expose shared prompts as explicit-only Codex skills."""
+    managed = HOME / '.codex' / 'skills' / 'agent-prompts'
+    paths = []
+    for prompt in sorted((AGENTS / 'prompts').glob('*.md')):
+        name = prompt.stem
+        if not re.fullmatch(r'[a-z0-9-]{1,64}', name):
+            raise ValueError(f'invalid Codex command name: {name}')
+        folder = managed / name
+        folder.mkdir(parents=True, exist_ok=True)
+        entry = folder / 'SKILL.md'
+        entry.write_text(
+            f'---\nname: {name}\n'
+            f'description: Run the shared {name} command when explicitly invoked.\n'
+            '---\n\n'
+            f'Read and follow the instructions in `{prompt.resolve()}`.\n'
+            'Treat any YAML front matter as metadata. Treat `$ARGUMENTS` as '
+            'the text supplied after this skill invocation, or empty when omitted.\n'
+        )
+        metadata = folder / 'agents' / 'openai.yaml'
+        metadata.parent.mkdir(exist_ok=True)
+        metadata.write_text('policy:\n  allow_implicit_invocation: false\n')
+        paths.append(entry)
+    return managed, paths
+
+
 def sync_skills_codex():
     """Register skills/*/ directories in ~/.codex/config.toml skills.config.
 
@@ -601,11 +627,13 @@ def sync_skills_codex():
 
     # Drop stale entries pointing into ~/.agents/skills/ (any layout) so the
     # list can be rebuilt from the current skills/ directory.
+    managed, prompt_skills = sync_prompt_skills_codex()
     stale_root = str((AGENTS / 'skills').resolve())
     kept = []
     for entry in entries:
         path = entry.get('path', '') if isinstance(entry, dict) else str(entry)
-        if str(Path(path).resolve()).startswith(stale_root + os.sep):
+        resolved = str(Path(path).resolve())
+        if resolved.startswith(stale_root + os.sep) or resolved.startswith(str(managed) + os.sep):
             continue
         kept.append(entry)
 
@@ -613,6 +641,7 @@ def sync_skills_codex():
         if skill.is_dir():
             kept.append({'path': str(skill.resolve()), 'enabled': True})
 
+    kept.extend({'path': str(path), 'enabled': True} for path in prompt_skills)
     doc.setdefault('skills', {})['config'] = kept
     write_toml(target, doc)
     print(f'  updated  {target} (skills.config: {len(kept)} entries)')
@@ -634,7 +663,6 @@ def run_codex(yolo=False):
         agents_md.write_text('\n\n---\n\n'.join(parts))
         print(f'  written  {agents_md} ({len(parts)} context files)')
     sync_skills_codex()
-    link_prompts(config_dir / 'commands')
     sync_mcp_codex()
     if yolo:
         yolo_codex()
