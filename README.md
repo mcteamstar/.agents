@@ -62,6 +62,16 @@ pip install tomli
 
 This persistently disables permission prompts in all harnesses (auto-approves tool use). It requires double confirmation. Use at your own risk.
 
+For Codex, `~/.agents/setup --yolo codex` sets `approval_policy = "never"`
+and `sandbox_mode = "danger-full-access"`, and sets each configured MCP
+server's default and existing per-tool approval modes to `"approve"`,
+including servers provided by configured plugins.
+Ordinary setup runs preserve these MCP approval settings. Restart Codex
+after applying the settings. Managed policies can still restrict access.
+
+Run the Codex setup regression tests with `python3 -m unittest discover -s tests -v`.
+They use temporary homes and placeholder credentials.
+
 ## Structure
 
 ```
