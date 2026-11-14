@@ -383,11 +383,12 @@ def sync_mcp_opencode():
 
     def to_opencode(cfg):
         result = {}
-        t = cfg.get('type', 'stdio')
+        t = cfg.get('type', 'remote' if 'url' in cfg else 'stdio')
         result['type'] = 'local' if t == 'stdio' else t
         cmd = cfg.get('command', '')
         args = cfg.get('args', [])
-        result['command'] = ([cmd] if cmd else []) + args
+        if t == 'stdio':
+            result['command'] = ([cmd] if cmd else []) + args
         env = cfg.get('env', {})
         if env:
             result['environment'] = env
